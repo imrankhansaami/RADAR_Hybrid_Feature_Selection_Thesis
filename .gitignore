@@ -1,0 +1,12 @@
+# raw datasets — published on Zenodo, not committed
+MLRan_full_dataset/
+MLRan_supplementary/*
+!MLRan_supplementary/results_temporal.csv
+!MLRan_supplementary/results_family_disjoint.csv
+!MLRan_supplementary/selected_features.csv
+
+# notebook / python noise
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.DS_Store
