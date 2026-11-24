@@ -1,0 +1,21 @@
+# Python dependencies for the RADAR hybrid feature-selection thesis.
+# Tested on Windows 11, Python 3.12; versions match the experiment environment
+# recorded in results/classical_results.json ("env" block).
+
+# --- classical pipeline (experiments/) ---
+numpy~=2.4
+pandas~=3.0
+scikit-learn~=1.9
+scipy~=1.18
+xgboost~=3.4
+
+# --- deep evaluator A2G-PTH (experiments/run_a2g.py, run_a2g_drift.py) ---
+tensorflow~=2.21
+
+# --- thesis document build (thesis/scripts/) ---
+python-docx~=1.2
+pymupdf~=1.28
+matplotlib~=3.11
+
+# --- separate MLRan side study (Thesis_Final.ipynb) ---
+# run with any recent jupyter/jupyterlab on top of the packages above

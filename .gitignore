@@ -1,12 +1,16 @@
-# raw datasets — published on Zenodo, not committed
+# raw datasets are published elsewhere, not committed
 MLRan_full_dataset/
 MLRan_supplementary/*
 !MLRan_supplementary/results_temporal.csv
 !MLRan_supplementary/results_family_disjoint.csv
 !MLRan_supplementary/selected_features.csv
+data/
+
+# build intermediates (the final docx/pdf are committed under thesis/)
+thesis/build/
+__pycache__/
 
 # notebook / python noise
 .ipynb_checkpoints/
-__pycache__/
 *.pyc
 .DS_Store

@@ -1,58 +1,116 @@
-# RADAR Hybrid Feature Selection — Thesis
+# Hybrid Voting and Percentage-Sweep Feature Selection for Ransomware Detection from Sysmon Events
 
-Thesis notebook and results for **hybrid feature selection on behavioural ransomware data**
-using the [MLRan](https://github.com/faithfulco/mlran) dataset.
+Bachelor's thesis (Sylhet International University, Department of CSE). The study is about
+**feature selection** for ransomware detection on **RADAR**, a published dataset of Sysmon
+host events collected from goodware and ransomware executions.
 
-## What is here
+The thesis re-implements two published selectors on RADAR with every threshold recomputed
+from RADAR training scores — consensus **voting** (FS-A) and the **percentage sweep** with a
+combined chi-square/F-test/mutual-information score (FS-B) — and proposes a **voting-ranked
+sweep (FS-C)** that links the two. The kept subsets are evaluated with seven classical
+classifiers and with the A2G-PTH deep model under a paper-faithful random split, a
+leakage-aware group split and a chronological drift split, with repeated seeds, significance
+tests and computational-cost measurements.
 
-| File | Purpose |
+## Repository map
+
+| Path | What it is |
 |---|---|
-| `Thesis_Final.ipynb` | Main pipeline: load → vote-based selection → temporal + family-disjoint evaluation |
-| `Thesis_Final_original_backup.ipynb` | Original RADAR-based notebook, kept for reference |
-| `thesis raw.pdf` | Thesis draft |
-| `MLRan_supplementary/results_temporal.csv` | Balanced accuracy / F1 / FNR / AUC by feature set × model |
-| `MLRan_supplementary/results_family_disjoint.csv` | Per-fold family-disjoint metrics |
-| `MLRan_supplementary/selected_features.csv` | Full 24,162-feature ranking with names, votes and MI |
+| `thesis/Hybrid ... .docx` / `.pdf` | the finished thesis (every result table filled from `results/`) |
+| `thesis/scripts/` | the python-docx build chain that produces the document; result numbers are pulled from `results/*.json` at build time |
+| `thesis/scripts/build_cycle.ps1` | one-command rebuild: docx → PDF via LibreOffice → page map |
+| `thesis/BUILD-GUIDE.md` | build and fill-in guide (what is left: the front-matter placeholders) |
+| `thesis/figures/` | the six diagrams used in the thesis |
+| `RADAR_Hybrid_Feature_Selection_Thesis_Plan.docx` | the working plan (dataset, protocols, experiment matrix fixed before the runs) |
+| `experiments/` | all experiment code (classical pipeline, A2G-PTH, seed/significance, sensitivity, drift) |
+| `results/*.json` | the raw output of every run — every number in the thesis traces back to these files |
+| `requirements.txt` | the Python environment used for the runs and the document build |
+| `MLRan_*` and `Thesis_Final.ipynb` | a **separate exploratory side study** on the AI-derived MLRan dataset — *not* part of the thesis (see below) |
+| `thesis raw.pdf` | earlier compiled draft, kept for history |
 
-The raw datasets are **not** committed: `MLRan_full_dataset/` is ~5 GB and is published on
-[Zenodo](https://zenodo.org/records/23403681). The notebook downloads the smaller MI set
-(~236 MB) automatically on first run.
+## Headline results (archived run in `results/`)
 
-## Dataset
+| Configuration | Model | Test F1 (ransomware) | F2 | Notes |
+|---|---|---|---|---|
+| All 21 features | XGBoost | 0.6056 | 0.7711 | baseline (P1 random split) |
+| FS-A — voting, 8 features | KNN | 0.5709 | 0.7412 | F2 just outside the pre-fixed 0.02 margin |
+| FS-B — sweep, 6 features (p = 30 %) | Decision tree | 0.6173 | 0.7920 | best single F1 |
+| FS-C — vote-ranked sweep, 10 features (p = 50 %) | XGBoost | 0.6033 | 0.7688 | within margin; not significantly different from baseline (McNemar p = 0.099) |
 
-MLRan contains **4,880 samples** (2,550 goodware + 2,330 ransomware from 64 families) with
-nine behavioural modalities: API, registry, file, directory, string, network, system,
-drop/delete and signature. The notebook uses the **MI-selected 24,162-feature set** with the
-official temporal split (3,905 train / 975 test).
+Other checks: kept subsets are identical across repeated seeds (Jaccard 1.00); the
+leakage-aware group split (P2) moves test F1 by at most 0.013, so the random-split numbers
+are not materially optimistic; the A2G-PTH deep model reproduces the subset ordering
+(all 21: F1 0.5701, FS-C: 0.5668, FS-A: 0.5497); on the chronological drift split the
+vote-based subsets stay above the full set (FS-A 0.2365, FS-C 0.2272 vs 0.1978).
 
-## Pipeline
+## Reproducing the results
 
-1. **Load** the MI train/test CSVs (`float32`, labels included).
-2. **Vote-based selection** (`paper1_votes`): mutual information, ANOVA F, RFE and
-   |correlation|. A feature is kept when at least two of the four rank it above their mean.
-   MI uses `discrete_features=True`; RFE runs on the top 2,000 MI features with `step=20`.
-3. **Temporal split evaluation** — vote≥2, top-483, the paper's RFE-483, and all MI features.
-4. **Family-disjoint protocol** — `GroupKFold` over families (goodware grouped by submission
-   year), with selection recomputed inside every fold.
-5. **Feature-count sweep** (25 → 1,000) and **modality breakdown** of the selected sets.
+1. Download RADAR from Zenodo (<https://doi.org/10.5281/zenodo.14542547>) and place the
+   engineered CSVs in `data/engineered/` (not committed — they are ~30 MB each):
 
-## Results (validation run)
+   ```text
+   data/engineered/dataset-imbalanced-10-engineered.csv   # primary file
+   data/engineered/dataset-imbalanced-5-engineered.csv    # sensitivity file
+   data/engineered/dataset-drift-engineered.csv           # drift file
+   ```
 
-| Protocol | Best balanced accuracy |
-|---|---|
-| Temporal split | 0.977 (LR / XGB on vote≥2 and all-MI) |
-| Family-disjoint (2 folds) | 0.959 (XGB), 0.955 (RF) |
+2. `pip install -r requirements.txt`
 
-The top-483 set is registry-heavy (428/483 registry features) and overlaps the paper's
-RFE-483 set by 45 features; mean Jaccard across family folds is 0.514.
+3. Run the pipelines from the repository root (each writes into `results/`):
 
-## How to run
+   ```bash
+   python experiments/run_experiments.py   # P1 + P2 classical runs, voting/sweep tables, cost
+   python experiments/run_a2g.py           # A2G-PTH deep evaluator (both graph variants)
+   python experiments/run_statistics.py    # 5-seed repeats + McNemar/paired-bootstrap tests
+   python experiments/run_sensitivity.py   # E8: Imbalanced-5, theta=0.75, RFE ablation, balancing arms
+   python experiments/run_drift.py         # E7: chronological split of the Drift stream
+   python experiments/run_a2g_drift.py     # E7 companion: compact A2G-PTH on the drift split
+   ```
 
-```bash
-pip install numpy pandas scikit-learn xgboost
-jupyter notebook Thesis_Final.ipynb
-```
+4. Rebuild the thesis document (needs LibreOffice for the PDF step):
 
-On Google Colab the notebook mounts Drive at `/content/drive/MyDrive/Thesis`; locally it
-uses the notebook folder. First run downloads the MI CSVs from Zenodo into
-`MLRan_supplementary/`. Runtime is about 13 minutes on a laptop.
+   ```powershell
+   python thesis\scripts\build.py
+   powershell -File thesis\scripts\build_cycle.ps1   # docx -> PDF
+   python thesis\scripts\extract_pagemap.py          # refresh ToC/LoF/LoT page numbers
+   powershell -File thesis\scripts\build_cycle.ps1   # rebuild with refreshed numbers
+   ```
+
+## Dataset and reference papers
+
+- **RADAR** — J. Ispahany, O. B. Deho, M. R. Islam, M. A. Khan and M. Z. Islam,
+  *RADAR: a realistic dataset for advancing ransomware detection*, Cybersecurity, 2025;
+  dataset DOI [10.5281/zenodo.14542547](https://doi.org/10.5281/zenodo.14542547).
+- **[1]** A. Goni, R. J. Momtahina and R. R. Chowdhury, *A Hybrid Voting-Based Feature
+  Selection Approach for Identifying Intrusions in IoT Networks*, WIECON-ECE 2025.
+- **[2]** A. Goni, R. J. Momtahina and R. R. Chowdhury, *A2G-PTH: An Adversarial Autoencoder
+  Graph Neural Network for Proactive Threat Hunting in IoT*, ICCIT 2025.
+
+See `CITATION.cff` to cite this repository (fill in the author names before archiving).
+
+## Statements
+
+- **Data availability** — all analysis uses the public RADAR dataset above; no new telemetry
+  was collected. The code and the run outputs that produce every number in the thesis are in
+  this repository (`experiments/`, `results/`).
+- **AI tools** — an AI-based assistant was used to help implement the pipeline and prepare
+  the manuscript; the study design was fixed before the runs, all experiments were run and
+  verified by the authors (see the "Statements" section of the thesis).
+- **Ethics** — no human participants, personal data or live malware were involved; the study
+  uses a previously collected, publicly released dataset.
+
+## MLRan side study (separate from the thesis)
+
+`Thesis_Final.ipynb` is an exploratory pipeline on the **MLRan** dataset
+(<https://github.com/faithfulco/mlran>) — a *different*, AI-derived dataset — and is kept in
+this repository for reference only; it is **not** part of the RADAR thesis and none of its
+numbers appear in the thesis. It runs the vote-based selection on MLRan's MI-selected
+24,162-feature set with the official temporal split (3,905 train / 975 test) plus a
+family-disjoint `GroupKFold` protocol; results are in `MLRan_supplementary/`. The raw MLRan
+dataset is ~5 GB and is not committed (the notebook downloads the smaller MI set on first
+run).
+
+## License
+
+MIT for the code (see `LICENSE`). The thesis text and figures are the authors' work — reuse
+with attribution (CC BY 4.0).
